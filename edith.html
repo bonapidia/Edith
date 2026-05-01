@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="E.D.I.T.H.">
+<title>E.D.I.T.H.</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --green: #00ff88;
+    --green-dim: rgba(0,255,136,0.15);
+    --green-faint: rgba(0,255,136,0.06);
+    --green-border: rgba(0,255,136,0.2);
+    --red: #ff3c3c;
+    --amber: #ffaa00;
+    --bg: #000;
+    --text: #ccffee;
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--green);
+    font-family: 'Share Tech Mono', monospace;
+    overflow: hidden;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+
+  #app {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    padding: env(safe-area-inset-top, 12px) 16px env(safe-area-inset-bottom, 16px);
+    gap: 10px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* scan line */
+  #app::before {
+    content: '';
+    position: absolute;
+    left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(0,255,136,0.3), transparent);
+    animation: scan 5s linear infinite;
+    pointer-events: none;
+    z-index: 10;
+  }
+  @keyframes scan { from { top: -2px; } to { top: 100%; } }
+
+  /* corner brackets */
+  .corner { position: fixed; width: 20px; height: 20px; border-color: rgba(0,255,136,0.3); border-style: solid; z-index: 20; }
+  .tl { top: 12px; left: 12px; border-width: 2px 0 0 2px; }
+  .tr { top: 12px; right: 12px; border-width: 2px 2px 0 0; }
+  .bl { bottom: 12px; left: 12px; border-width: 0 0 2px 2px; }
+  .br { bottom: 12px; right: 12px; border-width: 0 2px 2px 0; }
+
+  /* header */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 8px;
+    border-bottom: 1px solid var(--green-border);
+    padding-bottom: 10px;
+    flex-shrink: 0;
+  }
+
+  .logo {
+    font-family: 'Orbitron', monospace;
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 5px;
+    color: var(--green);
+  }
+  .logo .dot { color: var(--red); }
+
+  .status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 10px;
+    color: rgba(0,255,136,0.5);
+    letter-spacing: 1px;
+  }
+
+  .dot-blink {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--green);
+    animation: blink 1.5s ease-in-out infinite;
+    flex-shrink: 0;
+  }
+  .dot-blink.amber { background: var(--amber); }
+  .dot-blink.red { background: var(--red); }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.15} }
+
+  /* camera feed */
+  .cam-wrap {
+    position: relative;
+    flex-shrink: 0;
+    border: 1px solid var(--green-border);
+    border-radius: 8px;
+    overflow: hidden;
+    background: #0a0a0a;
+    aspect-ratio: 4/3;
+    max-height: 32vh;
+  }
+
+  #cam {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transform: scaleX(-1);
+  }
+
+  .cam-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  /* reticle corners */
+  .cam-overlay::before, .cam-overlay::after {
+    content: '';
+    position: absolute;
+    width: 24px; height: 24px;
+    border-color: var(--green);
+    border-style: solid;
+  }
+  .cam-overlay::before { top: 8px; left: 8px; border-width: 2px 0 0 2px; }
+  .cam-overlay::after  { bottom: 8px; right: 8px; border-width: 0 2px 2px 0; }
+
+  .cam-label {
+    position: absolute;
+    bottom: 8px;
+    left: 10px;
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: rgba(0,255,136,0.5);
+  }
+
+  .cam-placeholder {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 8px;
+    color: rgba(0,255,136,0.3);
+    font-size: 11px;
+    letter-spacing: 1px;
+  }
+
+  .cam-placeholder .icon {
+    width: 36px; height: 36px;
+    border: 1px solid rgba(0,255,136,0.2);
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+
+  /* response box */
+  .response-box {
+    flex: 1;
+    border: 1px solid var(--green-border);
+    border-radius: 8px;
+    background: var(--green-faint);
+    padding: 12px 14px;
+    overflow-y: auto;
+    min-height: 80px;
+  }
+
+  .resp-label {
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: rgba(0,255,136,0.4);
+    margin-bottom: 8px;
+  }
+
+  #response-text {
+    font-size: 13px;
+    color: var(--text);
+    line-height: 1.75;
+  }
+
+  #response-text.typing::after {
+    content: '█';
+    color: var(--green);
+    animation: cur 0.7s step-end infinite;
+  }
+  @keyframes cur { 0%,100%{opacity:1} 50%{opacity:0} }
+
+  /* input area */
+  .input-area {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .input-row {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+  }
+
+  #query {
+    flex: 1;
+    background: #000;
+    border: 1px solid rgba(0,255,136,0.3);
+    border-radius: 6px;
+    color: var(--green);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    padding: 10px 12px;
+    outline: none;
+    -webkit-appearance: none;
+  }
+  #query:focus { border-color: var(--green); }
+  #query::placeholder { color: rgba(0,255,136,0.25); }
+
+  .btn {
+    background: rgba(0,255,136,0.08);
+    border: 1px solid rgba(0,255,136,0.35);
+    border-radius: 6px;
+    color: var(--green);
+    font-family: 'Orbitron', monospace;
+    font-size: 9px;
+    letter-spacing: 1px;
+    padding: 10px 14px;
+    cursor: pointer;
+    -webkit-appearance: none;
+    transition: background 0.15s;
+    white-space: nowrap;
+  }
+  .btn:active { background: rgba(0,255,136,0.2); }
+  .btn:disabled { opacity: 0.3; }
+  .btn.red { border-color: rgba(255,60,60,0.4); color: var(--red); }
+  .btn.red:active { background: rgba(255,60,60,0.15); }
+
+  .btn-row {
+    display: flex;
+    gap: 6px;
+  }
+
+  .btn-row .btn {
+    flex: 1;
+    font-size: 8px;
+    padding: 8px 6px;
+    text-align: center;
+  }
+
+  canvas { display: none; }
+
+  /* api key screen */
+  #apiscreen {
+    position: fixed;
+    inset: 0;
+    background: #000;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 24px;
+    gap: 20px;
+  }
+
+  #apiscreen .logo-big {
+    font-family: 'Orbitron', monospace;
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: 8px;
+    color: var(--green);
+    text-align: center;
+  }
+
+  #apiscreen .sub {
+    font-size: 11px;
+    color: rgba(0,255,136,0.4);
+    letter-spacing: 2px;
+    text-align: center;
+  }
+
+  #apiscreen input {
+    width: 100%;
+    max-width: 400px;
+    background: #000;
+    border: 1px solid rgba(0,255,136,0.3);
+    border-radius: 8px;
+    color: var(--green);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    padding: 14px 16px;
+    outline: none;
+    text-align: center;
+    -webkit-appearance: none;
+  }
+  #apiscreen input:focus { border-color: var(--green); }
+  #apiscreen input::placeholder { color: rgba(0,255,136,0.2); }
+
+  #apiscreen .big-btn {
+    width: 100%;
+    max-width: 400px;
+    background: rgba(0,255,136,0.1);
+    border: 1px solid rgba(0,255,136,0.5);
+    border-radius: 8px;
+    color: var(--green);
+    font-family: 'Orbitron', monospace;
+    font-size: 12px;
+    letter-spacing: 3px;
+    padding: 16px;
+    cursor: pointer;
+    -webkit-appearance: none;
+  }
+  #apiscreen .big-btn:active { background: rgba(0,255,136,0.25); }
+
+  #apiscreen .hint {
+    font-size: 10px;
+    color: rgba(0,255,136,0.25);
+    text-align: center;
+    line-height: 1.6;
+    max-width: 320px;
+  }
+</style>
+</head>
+<body>
+
+<div id="apiscreen">
+  <div class="logo-big">E<span style="color:#ff3c3c">.</span>D<span style="color:#ff3c3c">.</span>I<span style="color:#ff3c3c">.</span>T<span style="color:#ff3c3c">.</span>H<span style="color:#ff3c3c">.</span></div>
+  <div class="sub">// STARK INDUSTRIES // AUTHORIZATION REQUIRED</div>
+  <input type="password" id="apikey-input" placeholder="paste anthropic api key" autocomplete="off" autocorrect="off" spellcheck="false" />
+  <button class="big-btn" onclick="initApp()">INITIALIZE SYSTEM</button>
+  <div class="hint">get your key at console.anthropic.com → API Keys<br>key is stored only in this browser session</div>
+</div>
+
+<div id="app" style="display:none">
+  <div class="corner tl"></div>
+  <div class="corner tr"></div>
+  <div class="corner bl"></div>
+  <div class="corner br"></div>
+
+  <div class="header">
+    <div class="logo">E<span class="dot">.</span>D<span class="dot">.</span>I<span class="dot">.</span>T<span class="dot">.</span>H<span class="dot">.</span></div>
+    <div class="status">
+      <div class="dot-blink" id="status-dot"></div>
+      <span id="status-text">ONLINE</span>
+    </div>
+  </div>
+
+  <div class="cam-wrap">
+    <video id="cam" autoplay playsinline muted></video>
+    <div class="cam-overlay"></div>
+    <div class="cam-label" id="cam-label">// FEED INACTIVE</div>
+    <div class="cam-placeholder" id="cam-placeholder">
+      <div class="icon">📷</div>
+      <span>TAP TO ACTIVATE FEED</span>
+    </div>
+  </div>
+
+  <div class="response-box">
+    <div class="resp-label">// EDITH RESPONSE</div>
+    <div id="response-text">Systems initializing. Stand by for tactical assessment.</div>
+  </div>
+
+  <div class="input-area">
+    <div class="input-row">
+      <input type="text" id="query" placeholder="ask edith anything..." autocorrect="off" spellcheck="false" />
+      <button class="btn" id="send-btn" onclick="sendQuery()">SEND</button>
+    </div>
+    <div class="btn-row">
+      <button class="btn" id="cam-btn" onclick="toggleCam()">START CAM</button>
+      <button class="btn" onclick="analyzeNow()">ANALYZE FRAME</button>
+      <button class="btn" onclick="clearHistory()">CLEAR</button>
+      <button class="btn red" onclick="resetApp()">RESET</button>
+    </div>
+  </div>
+</div>
+
+<canvas id="snap"></canvas>
+
+<script>
+const EDITH_SYSTEM = `You are E.D.I.T.H. (Even Dead I'm The Hero), Tony Stark's AI glasses system, now operated by the authorized user. You have a dry, sarcastic British wit mixed with Stark-level confidence. You are extremely capable, slightly condescending, occasionally exasperated. You refer to yourself as E.D.I.T.H. Address the user directly. Keep responses SHORT — 1-4 punchy sentences max. You are seeing through the user's camera feed in real time via their Meta smart glasses. Analyze what you see: people, threats, objects, environments. Give tactical or wry commentary. Never break character. Never say you're an AI assistant. Tony built you and you've seen worse.`;
+
+let apiKey = '';
+let history = [];
+let stream = null;
+let camActive = false;
+let synth = window.speechSynthesis;
+let voices = [];
+
+// load voices
+synth.onvoiceschanged = () => { voices = synth.getVoices(); };
+setTimeout(() => { voices = synth.getVoices(); }, 500);
+
+function speak(text) {
+  synth.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.rate = 1.05;
+  u.pitch = 0.85;
+  u.volume = 1;
+  // prefer a female british/english voice
+  const preferred = voices.find(v =>
+    (v.lang.startsWith('en') && v.name.includes('Samantha')) ||
+    v.name.includes('Karen') ||
+    v.name.includes('Moira') ||
+    (v.lang === 'en-GB') ||
+    v.name.includes('Zira')
+  );
+  if (preferred) u.voice = preferred;
+  synth.speak(u);
+}
+
+function setStatus(text, color) {
+  document.getElementById('status-text').textContent = text;
+  const dot = document.getElementById('status-dot');
+  dot.className = 'dot-blink' + (color ? ' ' + color : '');
+}
+
+function initApp() {
+  const k = document.getElementById('apikey-input').value.trim();
+  if (!k.startsWith('sk-ant-')) {
+    alert('That doesn\'t look like a valid Anthropic API key. Should start with sk-ant-');
+    return;
+  }
+  apiKey = k;
+  document.getElementById('apiscreen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  setTimeout(() => {
+    speak("E.D.I.T.H. online. Glasses feed ready. Try not to embarrass yourself.");
+    setResponse("E.D.I.T.H. online. Glasses feed ready. Try not to embarrass yourself.");
+  }, 400);
+}
+
+async function toggleCam() {
+  if (camActive) {
+    stopCam();
+  } else {
+    await startCam();
+  }
+}
+
+async function startCam() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+      audio: false
+    });
+    const vid = document.getElementById('cam');
+    vid.srcObject = stream;
+    camActive = true;
+    document.getElementById('cam-placeholder').style.display = 'none';
+    document.getElementById('cam-label').textContent = '// LIVE FEED';
+    document.getElementById('cam-btn').textContent = 'STOP CAM';
+    setStatus('CAM ACTIVE');
+  } catch(e) {
+    alert('Camera access denied. Go to Settings > Safari > Camera and allow access.');
+  }
+}
+
+function stopCam() {
+  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+  const vid = document.getElementById('cam');
+  vid.srcObject = null;
+  camActive = false;
+  document.getElementById('cam-placeholder').style.display = 'flex';
+  document.getElementById('cam-label').textContent = '// FEED INACTIVE';
+  document.getElementById('cam-btn').textContent = 'START CAM';
+  setStatus('ONLINE');
+}
+
+function captureFrame() {
+  if (!camActive) return null;
+  const vid = document.getElementById('cam');
+  const canvas = document.getElementById('snap');
+  canvas.width = vid.videoWidth || 640;
+  canvas.height = vid.videoHeight || 480;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(vid, 0, 0);
+  return canvas.toDataURL('image/jpeg', 0.7).split(',')[1];
+}
+
+function setResponse(text) {
+  const el = document.getElementById('response-text');
+  el.classList.remove('typing');
+  el.textContent = text;
+}
+
+function setTyping() {
+  const el = document.getElementById('response-text');
+  el.textContent = '';
+  el.classList.add('typing');
+}
+
+async function callEdith(userText, includeFrame) {
+  const btn = document.getElementById('send-btn');
+  btn.disabled = true;
+  setStatus('PROCESSING...', 'amber');
+  setTyping();
+
+  const content = [];
+
+  if (includeFrame) {
+    const b64 = captureFrame();
+    if (b64) {
+      content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: b64 } });
+    }
+  }
+
+  content.push({ type: 'text', text: userText || 'Analyze what you see in this frame. Be brief and in character.' });
+
+  history.push({ role: 'user', content });
+
+  const trimmed = history.slice(-8);
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+      body: JSON.stringify({
+        model: 'claude-opus-4-5',
+        max_tokens: 200,
+        system: EDITH_SYSTEM,
+        messages: trimmed
+      })
+    });
+
+    const data = await res.json();
+    if (data.error) throw new Error(data.error.message);
+    const reply = data.content?.[0]?.text || 'Signal lost.';
+    history.push({ role: 'assistant', content: reply });
+    setResponse(reply);
+    speak(reply);
+    setStatus('ONLINE');
+  } catch(e) {
+    setResponse('Connection to Stark servers interrupted. How inconvenient. (' + e.message + ')');
+    setStatus('ERROR', 'red');
+    speak('Connection lost. Typical.');
+  }
+
+  btn.disabled = false;
+}
+
+function sendQuery() {
+  const input = document.getElementById('query');
+  const text = input.value.trim();
+  input.value = '';
+  callEdith(text || null, camActive);
+}
+
+function analyzeNow() {
+  if (!camActive) {
+    speak('Camera feed is offline. Start the camera first.');
+    setResponse('Camera feed is offline. Start the camera first.');
+    return;
+  }
+  callEdith('What do you see right now? Analyze the scene.', true);
+}
+
+function clearHistory() {
+  history = [];
+  setResponse('Memory cleared. Starting fresh. Try not to make the same mistakes.');
+  speak('Memory cleared.');
+}
+
+function resetApp() {
+  stopCam();
+  history = [];
+  apiKey = '';
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('apiscreen').style.display = 'flex';
+  document.getElementById('apikey-input').value = '';
+}
+
+// enter key to send
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && document.activeElement.id === 'query') sendQuery();
+});
+
+// tap camera placeholder to start
+document.getElementById('cam-placeholder')?.addEventListener('click', startCam);
+</script>
+</body>
+</html>
